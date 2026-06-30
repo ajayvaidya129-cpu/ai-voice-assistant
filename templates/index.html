@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Voice & Chat Assistant</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #121212; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        
+        #assistant-container {
+            width: 100%; max-width: 500px; background-color: #1e1e2f; border-radius: 12px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.5); overflow: hidden;
+            display: flex; flex-direction: column; height: 80vh;
+        }
+        #chat-header { background-color: #4CAF50; padding: 15px; text-align: center; font-weight: bold; font-size: 18px; }
+        #chat-box { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        
+        .message { padding: 10px 14px; border-radius: 15px; max-width: 80%; line-height: 1.4; font-size: 14px;}
+        .user-msg { background-color: #4CAF50; align-self: flex-end; border-bottom-right-radius: 2px;}
+        .bot-msg { background-color: #3e3e5e; align-self: flex-start; border-bottom-left-radius: 2px;}
+        
+        #input-area { display: flex; padding: 15px; background-color: #121212; gap: 10px; }
+        #input-area input { flex: 1; padding: 10px; border-radius: 20px; border: none; outline: none; background: #2a2a40; color: white; padding-left: 15px;}
+        .icon-btn { background-color: #4CAF50; border-radius: 50%; width: 40px; height: 40px; display: flex; justify-content: center; align-items: center; cursor: pointer; font-size: 18px; transition: 0.3s; border: none;}
+        .icon-btn:hover { background-color: #45a049; }
+        #mic-btn.listening { background-color: #ff4c4c; animation: pulse 1s infinite; }
+        
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+    </style>
+</head>
+<body>
+
+    <div id="assistant-container">
+        <div id="chat-header">AI System Online</div>
+        <div id="chat-box">
+            <div class="message bot-msg">System initialized. Welcome back. How can I help you?</div>
+        </div>
+        <div id="input-area">
+            <button class="icon-btn" id="mic-btn" onclick="startListening()">🎤</button>
+            <input type="text" id="user-input" placeholder="Type a message..." onkeypress="handleKeyPress(event)">
+            <button class="icon-btn" onclick="sendMessage()">➤</button>
+        </div>
+    </div>
+
+    <script>
+        function appendMessage(text, sender) {
+            let chatBox = document.getElementById("chat-box");
+            let msgDiv = document.createElement("div");
+            msgDiv.className = `message ${sender === "user" ? "user-msg" : "bot-msg"}`;
+            msgDiv.innerText = text;
+            chatBox.appendChild(msgDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        async function getAIResponse(userText) {
+            appendMessage("Thinking...", "bot");
+            let chatBox = document.getElementById("chat-box");
+            let thinkingMsg = chatBox.lastChild;
+
+            try {
+                let response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: userText })
+                });
+                let data = await response.json();
+                
+                chatBox.removeChild(thinkingMsg); 
+                
+                if (data.reply) {
+                    appendMessage(data.reply, "bot");
+                    // Browser voice is completely removed from here!
+                } else {
+                    appendMessage("Error: " + data.error, "bot");
+                }
+            } catch (error) {
+                chatBox.removeChild(thinkingMsg);
+                appendMessage("Critical Error: Cannot reach the backend.", "bot");
+            }
+        }
+
+        function sendMessage() {
+            let inputField = document.getElementById("user-input");
+            let text = inputField.value.trim();
+            if(text === "") return;
+            appendMessage(text, "user");
+            inputField.value = "";
+            getAIResponse(text);
+        }
+
+        function handleKeyPress(event) {
+            if(event.key === "Enter") sendMessage();
+        }
+
+        const micBtn = document.getElementById("mic-btn");
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            const recognition = new SpeechRecognition();
+            recognition.onstart = () => micBtn.classList.add("listening");
+            recognition.onspeechend = () => { micBtn.classList.remove("listening"); recognition.stop(); };
+            recognition.onresult = (event) => {
+                document.getElementById("user-input").value = event.results[0][0].transcript;
+                sendMessage();
+            };
+            window.startListening = () => recognition.start();
+        } else {
+            micBtn.style.display = "none"; 
+        }
+        
+        // speakText function is completely deleted from here!
+    </script>
+</body>
+</html>
